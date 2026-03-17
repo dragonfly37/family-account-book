@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>가족 가계부</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 font-sans antialiased text-gray-800">
+
+  <div class="max-w-md mx-auto bg-white min-h-screen shadow-lg relative">
+    
+    <header class="bg-blue-600 text-white p-4 sticky top-0 z-10 shadow-md flex justify-between items-center">
+      <h1 class="text-xl font-bold">💸 가족 가계부</h1>
+      <div id="todayDateDisplay" class="text-xs bg-blue-800 px-2 py-1 rounded font-medium">로딩중...</div>
+    </header>
+
+    <main class="p-4 pb-24">
+      
+      <section class="mb-6">
+        <div class="flex justify-between items-end mb-3 border-b pb-2">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-800">월별 요약 및 정산</h2>
+            <p class="text-[11px] text-gray-500">선택한 달에 따라 대시보드와 리스트가 연동됩니다.</p>
+          </div>
+          <input type="month" id="monthSelector" onchange="applyFilters()" class="border rounded p-1 text-sm bg-gray-50 text-gray-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm">
+            <p class="text-[11px] text-blue-600 font-bold mb-1" id="expenseLabel">선택월 순수 지출</p>
+            <p class="text-lg font-extrabold text-gray-800">₩<span id="totalExpense">0</span></p>
+          </div>
+          <div class="bg-red-50 p-4 rounded-xl border border-red-100 shadow-sm">
+            <p class="text-[11px] text-red-600 font-bold mb-1">🔥 전체 미정산 (누적)</p>
+            <p class="text-lg font-extrabold text-gray-800">₩<span id="pendingAmount">0</span></p>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+          <p class="text-xs text-gray-500 font-bold text-center mb-2" id="chartLabel">선택월 주차별 지출 흐름</p>
+          <div class="relative h-48 w-full"><canvas id="categoryChart"></canvas></div>
+        </div>
+      </section>
+
+      <section class="bg-gray-50 p-4 rounded-xl shadow-inner mb-6 border border-gray-200" id="formSection">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-lg font-semibold" id="formTitle">새로운 기록</h2>
+          <button type="button" id="cancelEditBtn" class="hidden text-xs bg-red-100 text-red-600 px-2 py-1 rounded font-bold" onclick="cancelEdit()">취소</button>
+        </div>
+        <form id="recordForm" class="space-y-3">
+          <input type="hidden" id="editId" value="">
+          
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">날짜</label>
+              <input type="date" id="date" required class="w-full border rounded p-2 text-sm bg-white">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">금액 (숫자만)</label>
+              <input type="number" id="amount" required placeholder="예: 20590" class="w-full border rounded p-2 text-sm text-right">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">분류</label>
+              <select id="class" required class="w-full border rounded p-2 text-sm bg-white">
+                <option value="">로딩중...</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">카테고리</label>
+              <select id="category" required class="w-full border rounded p-2 text-sm bg-white">
+                <option value="">로딩중...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">세부 (어디서?)</label>
+              <input type="text" id="subCategory" placeholder="예: 쿠팡" class="w-full border rounded p-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">항목 (무엇을?)</label>
+              <input type="text" id="item" placeholder="예: 감자, 닭다리살" class="w-full border rounded p-2 text-sm">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">정산 상태</label>
+              <select id="settlement" class="w-full border rounded p-2 text-sm bg-white">
+                <option value="">로딩중...</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">마감 여부</label>
+              <select id="closed" class="w-full border rounded p-2 text-sm bg-white">
+                <option value="">로딩중...</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" id="submitBtn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg mt-2 hover:bg-blue-700 transition">
+            기록 저장하기
+          </button>
+        </form>
+      </section>
+
+      <section>
+        <div class="flex justify-between items-center mb-2">
+          <h2 class="text-lg font-semibold shrink-0">최근 내역</h2>
+          <div class="flex space-x-1">
+            <select id="sortSelector" onchange="applyFilters()" class="text-[11px] border rounded p-1 bg-white focus:outline-none">
+              <option value="dateDesc">날짜 최신순</option>
+              <option value="dateAsc">날짜 과거순</option>
+              <option value="amountDesc">금액 높은순</option>
+              <option value="amountAsc">금액 낮은순</option>
+            </select>
+            <button onclick="toggleFilters()" class="text-[11px] bg-blue-50 text-blue-600 border border-blue-200 px-2 py-1 rounded hover:bg-blue-100">⚙️ 필터</button>
+            <button onclick="loadData()" class="text-[11px] bg-gray-200 px-2 py-1 rounded hover:bg-gray-300">🔄</button>
+          </div>
+        </div>
+
+        <div id="filterContainer" class="hidden bg-gray-50 p-3 rounded-lg mb-3 border border-gray-200 grid grid-cols-2 gap-2 text-xs shadow-inner">
+           <input type="date" id="filterDate" onchange="applyFilters()" class="border rounded p-1 bg-white" title="특정 날짜 필터">
+           <select id="filterClass" onchange="applyFilters()" class="border rounded p-1 bg-white"><option value="">모든 분류</option></select>
+           <select id="filterCategory" onchange="applyFilters()" class="border rounded p-1 bg-white"><option value="">모든 카테고리</option></select>
+           <select id="filterSettlement" onchange="applyFilters()" class="border rounded p-1 bg-white"><option value="">모든 정산상태</option></select>
+           <select id="filterClosed" onchange="applyFilters()" class="border rounded p-1 bg-white"><option value="">모든 마감여부</option></select>
+           <button onclick="resetFilters()" class="col-span-2 bg-gray-300 rounded p-1.5 font-bold text-gray-700 hover:bg-gray-400 mt-1">필터 초기화</button>
+        </div>
+        
+        <div id="loading" class="text-center text-gray-500 py-4">데이터를 불러오는 중입니다...</div>
+        <ul id="recordList" class="space-y-3"></ul>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbwrD9qwVqlPJbgt5yDJC3dU7IsemRprxDVQ7YAsmZbMgyq-HzTxfDAqncB_ZX8KiopN/exec";
+    
+    let myChart = null; 
+    let allData = []; 
+
+    const today = new Date();
+    document.getElementById('date').valueAsDate = today;
+    const dateOptions = { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' };
+    document.getElementById('todayDateDisplay').innerText = today.toLocaleDateString('ko-KR', dateOptions);
+
+    const currentMonthStr = today.toISOString().substring(0, 7);
+    document.getElementById('monthSelector').value = currentMonthStr;
+
+    // 데이터 전체 로드
+    async function loadData() {
+      const loadingEl = document.getElementById('loading');
+      document.getElementById('recordList').innerHTML = '';
+      loadingEl.style.display = 'block';
+
+      try {
+        const response = await fetch(API_URL + "?t=" + new Date().getTime());
+        const result = await response.json(); 
+        
+        allData = result.data || [];
+        const entities = result.entities || null;
+        
+        loadingEl.style.display = 'none';
+
+        if (entities) {
+          // 폼 드롭다운 채우기
+          populateDropdown('class', entities.Class);
+          populateDropdown('category', entities.Category);
+          populateDropdown('settlement', entities.Settlement);
+          populateDropdown('closed', entities.Closed);
+
+          // 필터 드롭다운 채우기
+          populateFilterDropdown('filterClass', entities.Class, '모든 분류');
+          populateFilterDropdown('filterCategory', entities.Category, '모든 카테고리');
+          populateFilterDropdown('filterSettlement', entities.Settlement, '모든 정산상태');
+          populateFilterDropdown('filterClosed', entities.Closed, '모든 마감여부');
+        }
+
+        // 데이터 로드 후 필터/정렬 즉시 적용
+        applyFilters();
+
+      } catch (error) {
+        loadingEl.innerText = "데이터 로드 실패";
+      }
+    }
+
+    // 폼용 옵션 헬퍼
+    function populateDropdown(elementId, itemsArray) {
+      const selectEl = document.getElementById(elementId);
+      selectEl.innerHTML = ''; 
+      itemsArray.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        selectEl.appendChild(option);
+      });
+    }
+
+    // 필터용 옵션 헬퍼 (기본 '모든~' 값 포함)
+    function populateFilterDropdown(elementId, itemsArray, defaultText) {
+      const selectEl = document.getElementById(elementId);
+      selectEl.innerHTML = `<option value="">${defaultText}</option>`;
+      itemsArray.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        selectEl.appendChild(option);
+      });
+    }
+
+    // ⚙️ 필터 패널 열기/닫기
+    function toggleFilters() {
+      document.getElementById('filterContainer').classList.toggle('hidden');
+    }
+
+    // 🔄 필터 초기화
+    function resetFilters() {
+      document.getElementById('filterDate').value = '';
+      document.getElementById('filterClass').value = '';
+      document.getElementById('filterCategory').value = '';
+      document.getElementById('filterSettlement').value = '';
+      document.getElementById('filterClosed').value = '';
+      applyFilters();
+    }
+
+    // ★ 통합 필터링 및 정렬 실행 함수 (핵심)
+    function applyFilters() {
+      const month = document.getElementById('monthSelector').value;
+      const sort = document.getElementById('sortSelector').value;
+      
+      const fDate = document.getElementById('filterDate').value;
+      const fClass = document.getElementById('filterClass').value;
+      const fCategory = document.getElementById('filterCategory').value;
+      const fSettlement = document.getElementById('filterSettlement').value;
+      const fClosed = document.getElementById('filterClosed').value;
+
+      // 1. 대시보드 업데이트 (대시보드는 '월' 기준 전체 데이터 사용)
+      renderDashboard(allData, month);
+
+      // 2. 리스트 필터링 (선택한 월에 포함되는 것만)
+      let filtered = allData.filter(row => row.Date && row.Date.startsWith(month));
+
+      // 추가 필터 조건 적용
+      if (fDate) filtered = filtered.filter(row => row.Date && row.Date.startsWith(fDate));
+      if (fClass) filtered = filtered.filter(row => row.Class === fClass);
+      if (fCategory) filtered = filtered.filter(row => row.Category === fCategory);
+      if (fSettlement) filtered = filtered.filter(row => row.Settlement === fSettlement);
+      if (fClosed) filtered = filtered.filter(row => row.Closed === fClosed);
+
+      // 3. 리스트 정렬
+      filtered.sort((a, b) => {
+        const dateA = new Date(a.Date).getTime() || 0;
+        const dateB = new Date(b.Date).getTime() || 0;
+        const amtA = Number(a.Amount) || 0;
+        const amtB = Number(b.Amount) || 0;
+
+        if (sort === 'dateDesc') return dateB - dateA || b.ID - a.ID;
+        if (sort === 'dateAsc') return dateA - dateB || a.ID - b.ID;
+        if (sort === 'amountDesc') return amtB - amtA || dateB - dateA;
+        if (sort === 'amountAsc') return amtA - amtB || dateB - dateA;
+      });
+
+      // 4. 리스트 렌더링
+      renderList(filtered);
+    }
+
+    // 필터/정렬이 완료된 데이터를 화면에 그리기
+    function renderList(data) {
+      const listEl = document.getElementById('recordList');
+      listEl.innerHTML = '';
+      if (data.length === 0) {
+        listEl.innerHTML = '<li class="text-center text-gray-500 py-4">조건에 맞는 내역이 없습니다.</li>';
+        return;
+      }
+      
+      // 이미 정렬되어 있으므로 reverse() 없이 그대로 그림
+      data.forEach(row => {
+        const amt = Number(row.Amount) || 0;
+        const li = document.createElement('li');
+        li.className = "bg-white p-3 rounded-lg shadow border border-gray-100";
+        li.innerHTML = `
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex-1">
+              <div class="flex items-center space-x-2 mb-1">
+                <span class="text-[10px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">${row.Class}</span>
+                <span class="text-xs text-gray-500">${row.Date ? row.Date.split('T')[0] : ''}</span>
+              </div>
+              <p class="text-sm font-semibold">${row.Item || row.SubCategory || '내용 없음'}</p>
+              <p class="text-xs text-gray-400 mt-0.5">${row.Category}</p>
+            </div>
+            <div class="text-right">
+              <p class="font-bold text-gray-800">₩${amt.toLocaleString('ko-KR')}</p>
+              <p class="text-[10px] ${row.Settlement === '지급 대기' ? 'text-red-500 font-bold bg-red-50 px-1 rounded inline-block mt-1' : 'text-gray-400 mt-1'}">${row.Settlement}</p>
+            </div>
+          </div>
+          <div class="flex justify-end space-x-2 pt-2 border-t border-gray-50 mt-2">
+            <button onclick="startEdit('${row.ID}')" class="text-xs text-gray-500 hover:text-blue-600 bg-gray-100 px-2 py-1 rounded">✏️ 수정</button>
+            <button onclick="deleteRecord('${row.ID}')" class="text-xs text-gray-500 hover:text-red-600 bg-gray-100 px-2 py-1 rounded">🗑️ 삭제</button>
+          </div>
+        `;
+        listEl.appendChild(li);
+      });
+    }
+
+    function renderDashboard(data, monthPrefix) {
+      let totalExpense = 0;
+      let pendingAmount = 0;
+      let weeklyTotals = { '1주차': 0, '2주차': 0, '3주차': 0, '4주차': 0, '5주차': 0 };
+
+      data.forEach(row => {
+        const amt = Number(row.Amount) || 0;
+        
+        if (row.Settlement === '지급 대기') {
+          pendingAmount += amt;
+        }
+
+        if (row.Date && row.Date.startsWith(monthPrefix)) {
+          if (row.Class !== '제외(개인/저축/이자)' && row.Category !== '10. 저축/투자') {
+            totalExpense += amt;
+
+            const dateObj = new Date(row.Date);
+            const day = dateObj.getDate();
+            let weekNum = Math.ceil(day / 7);
+            if (weekNum > 5) weekNum = 5; 
+            
+            weeklyTotals[`${weekNum}주차`] += amt;
+          }
+        }
+      });
+
+      const monthOnly = monthPrefix.split('-')[1]; 
+      document.getElementById('expenseLabel').innerText = `${Number(monthOnly)}월 순수 지출`;
+      document.getElementById('chartLabel').innerText = `${Number(monthOnly)}월 주차별 지출 흐름`;
+      document.getElementById('totalExpense').innerText = totalExpense.toLocaleString('ko-KR');
+      document.getElementById('pendingAmount').innerText = pendingAmount.toLocaleString('ko-KR');
+      
+      drawChart(weeklyTotals);
+    }
+
+    function drawChart(weeklyData) {
+      const ctx = document.getElementById('categoryChart').getContext('2d');
+      if (myChart) { myChart.destroy(); } 
+      
+      const labels = Object.keys(weeklyData);
+      const data = Object.values(weeklyData);
+
+      const isAllZero = data.every(val => val === 0);
+      if (isAllZero) return; 
+
+      myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '지출액',
+            data: data,
+            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+            borderColor: 'rgba(37, 99, 235, 1)',
+            borderWidth: 1,
+            borderRadius: 6 
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { callback: function(value) { return '₩' + value.toLocaleString('ko-KR'); } }
+            }
+          }
+        }
+      });
+    }
+
+    async function deleteRecord(id) {
+      if(!confirm("정말로 삭제하시겠습니까?")) return;
+      try {
+        await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: "follow", body: JSON.stringify({ action: 'delete', id: id }) });
+        alert("삭제되었습니다.");
+        loadData();
+      } catch (error) { alert("삭제 실패"); }
+    }
+
+    function startEdit(id) {
+      const row = allData.find(d => d.ID.toString() === id.toString());
+      if(!row) return;
+      document.getElementById('editId').value = row.ID;
+      document.getElementById('date').value = row.Date ? row.Date.split('T')[0] : '';
+      document.getElementById('amount').value = row.Amount;
+      document.getElementById('class').value = row.Class;
+      document.getElementById('category').value = row.Category;
+      document.getElementById('subCategory').value = row.SubCategory;
+      document.getElementById('item').value = row.Item;
+      document.getElementById('settlement').value = row.Settlement;
+      document.getElementById('closed').value = row.Closed;
+      
+      document.getElementById('formTitle').innerText = "기록 수정하기";
+      document.getElementById('formTitle').className = "text-lg font-bold text-blue-600";
+      document.getElementById('submitBtn').innerText = "수정 내용 저장";
+      document.getElementById('submitBtn').className = "w-full bg-yellow-500 text-white font-bold py-3 rounded-lg mt-2 hover:bg-yellow-600 transition";
+      document.getElementById('cancelEditBtn').classList.remove('hidden');
+      window.scrollTo({ top: document.getElementById('formSection').offsetTop - 60, behavior: 'smooth' });
+    }
+
+    function cancelEdit() {
+      document.getElementById('recordForm').reset();
+      document.getElementById('editId').value = '';
+      document.getElementById('date').valueAsDate = new Date();
+      document.getElementById('formTitle').innerText = "새로운 기록";
+      document.getElementById('formTitle').className = "text-lg font-semibold";
+      document.getElementById('submitBtn').innerText = "기록 저장하기";
+      document.getElementById('submitBtn').className = "w-full bg-blue-600 text-white font-bold py-3 rounded-lg mt-2 hover:bg-blue-700 transition";
+      document.getElementById('cancelEditBtn').classList.add('hidden');
+    }
+
+    document.getElementById('recordForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      const originalText = submitBtn.innerText;
+      submitBtn.innerText = "처리 중...";
+      submitBtn.disabled = true;
+
+      const editId = document.getElementById('editId').value;
+      const payload = {
+        action: editId ? 'update' : 'create',
+        id: editId,
+        Date: document.getElementById('date').value,
+        Amount: document.getElementById('amount').value,
+        Class: document.getElementById('class').value,
+        Category: document.getElementById('category').value,
+        SubCategory: document.getElementById('subCategory').value,
+        Item: document.getElementById('item').value,
+        Settlement: document.getElementById('settlement').value,
+        Closed: document.getElementById('closed').value
+      };
+
+      try {
+        await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: "follow", body: JSON.stringify(payload) });
+        alert(editId ? "수정되었습니다!" : "저장되었습니다!");
+        cancelEdit();
+        loadData();
+      } catch (error) { alert("처리 실패했습니다."); } finally {
+        submitBtn.innerText = originalText;
+        submitBtn.disabled = false;
+      }
+    });
+
+    loadData();
+  </script>
+</body>
+</html>
