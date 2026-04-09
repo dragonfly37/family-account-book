@@ -382,7 +382,9 @@
       <div class="card" style="padding:18px;">
         <div style="margin-bottom:14px;">
           <label class="form-label">📍 어디서?</label>
-          <input type="text" id="subCategory" placeholder="예: 쿠팡, 마트, 배달" class="form-input">
+          <select id="subCategory" class="form-input">
+            <option value="">불러오는 중...</option>
+          </select>
         </div>
         <div>
           <label class="form-label">🛒 무엇을?</label>
@@ -390,17 +392,11 @@
         </div>
       </div>
 
-      <!-- 정산 & 마감 -->
+      <!-- 정산 상태 -->
       <div class="card" style="padding:18px;">
-        <div style="margin-bottom:14px;">
+        <div>
           <label class="form-label">💳 정산 상태</label>
           <select id="settlement" class="form-input">
-            <option value="">불러오는 중...</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label">✅ 마감 여부</label>
-          <select id="closed" class="form-input">
             <option value="">불러오는 중...</option>
           </select>
         </div>
@@ -572,14 +568,18 @@ async function loadData() {
     const entities = result.entities || null;
     document.getElementById('loading').style.display = 'none';
     if (entities) {
-      populateDropdown('class',      entities.Class);
-      populateDropdown('category',   entities.Category);
-      populateDropdown('settlement', entities.Settlement);
-      populateDropdown('closed',     entities.Closed);
+      // API 엔티티 키 실제 매핑:
+      // entities.Class      → 분류 값
+      // entities.Category   → 카테고리 값
+      // entities.Settlement → 서브카테고리(구매처) 값  ← API 버그: 키 이름 불일치
+      // entities.Closed     → 정산 상태 값            ← API 버그: 키 이름 불일치
+      populateDropdown('class',       entities.Class);
+      populateDropdown('category',    entities.Category);
+      populateDropdown('subCategory', entities.Settlement);  // 실제로는 구매처 목록
+      populateDropdown('settlement',  entities.Closed);      // 실제로는 정산상태 목록
       populateFilterSelect('filterClass',      entities.Class,      '👤 분류');
       populateFilterSelect('filterCategory',   entities.Category,   '🏷️ 카테고리');
-      populateFilterSelect('filterSettlement', entities.Settlement, '💳 정산');
-      populateFilterSelect('filterClosed',     entities.Closed,     '마감 여부');
+      populateFilterSelect('filterSettlement', entities.Closed,     '💳 정산');  // 실제 정산상태
     }
     applyFilters();
   } catch (e) {
@@ -874,7 +874,6 @@ function startEdit(id) {
   document.getElementById('subCategory').value= row.SubCategory;
   document.getElementById('item').value       = row.Item;
   document.getElementById('settlement').value = row.Settlement;
-  document.getElementById('closed').value     = row.Closed;
   document.getElementById('formTitle').innerText = '기록 수정';
   document.getElementById('submitBtn').className = 'btn-edit';
   document.getElementById('submitBtn').innerText  = '수정 저장';
@@ -908,7 +907,7 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
     SubCategory: document.getElementById('subCategory').value,
     Item:        document.getElementById('item').value,
     Settlement:  document.getElementById('settlement').value,
-    Closed:      document.getElementById('closed').value,
+    Closed:      'Yes',  // 등록 시 자동 마감 처리
   };
   try {
     await fetch(API_URL, {
