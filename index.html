@@ -366,7 +366,7 @@
       <div class="card" style="padding:18px;">
         <div style="margin-bottom:14px;">
           <label class="form-label">👤 분류</label>
-          <select id="class" required class="form-input">
+          <select id="class" required class="form-input" onchange="onClassChange()">
             <option value="">불러오는 중...</option>
           </select>
         </div>
@@ -617,14 +617,33 @@ function populateFilterSelect(id, arr, placeholder) {
 }
 
 // ── Form defaults ────────────────────────────────────────
+const NO_SETTLEMENT_CLASSES = new Set([
+  '공용카드(쿠팡)', '공용계좌(토스)', '온누리', '제외(개인/저축/이자)'
+]);
+
+function getSettlementDefault(cls) {
+  return NO_SETTLEMENT_CLASSES.has(cls) ? '정산 불필요' : '정산 필요';
+}
+
 function setFormDefaults() {
   if (document.getElementById('editId').value) return; // 수정 모드면 건너뜀
-  const setDefault = (id, val) => {
+  const setVal = (id, val) => {
     const el = document.getElementById(id);
     if (el && [...el.options].some(o => o.value === val)) el.value = val;
   };
-  setDefault('class',      '공용카드(쿠팡)');
-  setDefault('settlement', '정산 필요');
+  setVal('class', '공용카드(쿠팡)');
+  setVal('settlement', getSettlementDefault('공용카드(쿠팡)'));
+}
+
+// 분류 변경 시 정산 상태 자동 업데이트
+function onClassChange() {
+  if (document.getElementById('editId').value) return; // 수정 모드면 건너뜀
+  const cls = document.getElementById('class').value;
+  const defaultSettlement = getSettlementDefault(cls);
+  const settlementEl = document.getElementById('settlement');
+  if (settlementEl && [...settlementEl.options].some(o => o.value === defaultSettlement)) {
+    settlementEl.value = defaultSettlement;
+  }
 }
 
 // ── Chip filter ──────────────────────────────────────────
