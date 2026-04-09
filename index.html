@@ -461,6 +461,83 @@
 
 
   <!-- ════════════════════════════════════════
+       TAB: ANALYSIS
+  ════════════════════════════════════════ -->
+  <div id="tab-analysis" class="tab-content" style="padding:16px 16px 88px;">
+
+    <!-- 범위 토글 -->
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <button id="scope-all" onclick="setAnalysisScope('all')"
+        style="flex:1; padding:10px; border-radius:12px; font-size:13px; font-weight:700;
+               border:none; cursor:pointer; background:#0064FF; color:white; transition:all 0.15s;">전체 기간</button>
+      <button id="scope-month" onclick="setAnalysisScope('month')"
+        style="flex:1; padding:10px; border-radius:12px; font-size:13px; font-weight:700;
+               border:none; cursor:pointer; background:#F5F6F8; color:#8B95A1; transition:all 0.15s;" id="scope-month">이번 달</button>
+    </div>
+
+    <!-- 섹션 칩 -->
+    <div class="chips-row" style="margin-bottom:16px;">
+      <button class="chip active asec-chip" id="chip-asec-monthly"  onclick="switchAnalysisSection('monthly')">📅 월별</button>
+      <button class="chip asec-chip"        id="chip-asec-category" onclick="switchAnalysisSection('category')">🏷️ 카테고리</button>
+      <button class="chip asec-chip"        id="chip-asec-class"    onclick="switchAnalysisSection('class')">👤 분류</button>
+      <button class="chip asec-chip"        id="chip-asec-sub"      onclick="switchAnalysisSection('sub')">📍 구매처</button>
+      <button class="chip asec-chip"        id="chip-asec-top"      onclick="switchAnalysisSection('top')">🏆 TOP10</button>
+    </div>
+
+    <!-- ── 섹션: 월별 ── -->
+    <div id="asec-monthly" class="asec">
+      <div class="card" style="padding:18px 20px; margin-bottom:10px;">
+        <p style="font-size:12px; font-weight:700; color:#8B95A1; margin-bottom:14px;">월별 순수 지출 추이</p>
+        <div style="position:relative; height:180px;"><canvas id="monthlyAnalysisChart"></canvas></div>
+      </div>
+      <div class="card" style="padding:18px 20px;">
+        <p style="font-size:12px; font-weight:700; color:#8B95A1; margin-bottom:10px;">월별 상세</p>
+        <div id="monthly-analysis-table"></div>
+      </div>
+    </div>
+
+    <!-- ── 섹션: 카테고리 ── -->
+    <div id="asec-category" class="asec" style="display:none;">
+      <div class="card" style="padding:18px 20px; margin-bottom:10px;">
+        <p style="font-size:12px; font-weight:700; color:#8B95A1; margin-bottom:14px;">카테고리 비율</p>
+        <div style="position:relative; height:200px;"><canvas id="catDonutChart"></canvas></div>
+      </div>
+      <div class="card" style="padding:18px 20px;">
+        <p style="font-size:12px; font-weight:700; color:#8B95A1; margin-bottom:10px;">카테고리별 상세</p>
+        <div id="cat-analysis-bars"></div>
+      </div>
+    </div>
+
+    <!-- ── 섹션: 분류 ── -->
+    <div id="asec-class" class="asec" style="display:none;">
+      <div class="card" style="padding:18px 20px;">
+        <p style="font-size:12px; font-weight:700; color:#8B95A1; margin-bottom:10px;">분류(누구)별 지출</p>
+        <div id="class-analysis-bars"></div>
+      </div>
+    </div>
+
+    <!-- ── 섹션: 구매처 ── -->
+    <div id="asec-sub" class="asec" style="display:none;">
+      <div class="card" style="padding:18px 20px;">
+        <p style="font-size:12px; font-weight:700; color:#8B95A1; margin-bottom:10px;">구매처별 지출</p>
+        <div id="sub-analysis-bars"></div>
+      </div>
+    </div>
+
+    <!-- ── 섹션: TOP10 ── -->
+    <div id="asec-top" class="asec" style="display:none;">
+      <div class="card" style="padding:18px 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <p style="font-size:12px; font-weight:700; color:#8B95A1;">선택 월 TOP 10 지출</p>
+          <span id="top10-month-label" style="font-size:11px; font-weight:700; color:#0064FF; background:#EBF4FF; padding:3px 8px; border-radius:20px;"></span>
+        </div>
+        <div id="top10-list"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════
        BOTTOM NAV
   ════════════════════════════════════════ -->
   <nav class="bottom-nav">
@@ -475,6 +552,10 @@
     <button class="nav-btn" id="nav-list" onclick="switchTab('list')">
       <span class="nav-icon">📋</span>
       <span>내역</span>
+    </button>
+    <button class="nav-btn" id="nav-analysis" onclick="switchTab('analysis')">
+      <span class="nav-icon">📊</span>
+      <span>분석</span>
     </button>
   </nav>
 
@@ -539,6 +620,7 @@ function switchTab(tab) {
   document.getElementById('addCircle').style.background =
     tab === 'add' ? '#0052D9' : '#0064FF';
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (tab === 'analysis' && allData.length) renderAnalysis();
 }
 
 // ── Month ────────────────────────────────────────────────
@@ -558,6 +640,7 @@ function updateMonthLabel(val) {
 function onMonthChange() {
   updateMonthLabel(document.getElementById('monthSelector').value);
   applyFilters();
+  if (document.getElementById('tab-analysis').classList.contains('active')) renderAnalysis();
 }
 
 // ── Load Data ────────────────────────────────────────────
@@ -963,6 +1046,348 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
     btn.innerText = orig; btn.disabled = false;
   }
 });
+
+// ════════════════════════════════════════════════════════
+//  ANALYSIS TAB
+// ════════════════════════════════════════════════════════
+let analysisScope     = 'all';
+let monthlyChartInst  = null;
+let catChartInst      = null;
+
+// ── Scope toggle ─────────────────────────────────────────
+function setAnalysisScope(scope) {
+  analysisScope = scope;
+  const allBtn   = document.getElementById('scope-all');
+  const moBtn    = document.getElementById('scope-month');
+  allBtn.style.background  = scope === 'all'   ? '#0064FF' : '#F5F6F8';
+  allBtn.style.color       = scope === 'all'   ? 'white'   : '#8B95A1';
+  moBtn.style.background   = scope === 'month' ? '#0064FF' : '#F5F6F8';
+  moBtn.style.color        = scope === 'month' ? 'white'   : '#8B95A1';
+  renderAnalysis();
+}
+
+// ── Section chip switcher ────────────────────────────────
+function switchAnalysisSection(sec) {
+  document.querySelectorAll('.asec').forEach(el => el.style.display = 'none');
+  document.getElementById('asec-' + sec).style.display = 'block';
+  document.querySelectorAll('.asec-chip').forEach(el => el.classList.remove('active'));
+  document.getElementById('chip-asec-' + sec).classList.add('active');
+  renderAnalysis();
+}
+
+// ── Main render ──────────────────────────────────────────
+function renderAnalysis() {
+  if (!allData.length) return;
+  const currentMonth = document.getElementById('monthSelector').value;
+
+  const base = analysisScope === 'month'
+    ? allData.filter(r => r.Date && r.Date.startsWith(currentMonth))
+    : allData;
+
+  // "순수 지출" excludes savings & personal-exclusion class
+  const pure = base.filter(r =>
+    r.Class !== '제외(개인/저축/이자)' && r.Category !== '10. 저축/투자'
+  );
+
+  const visible = ['monthly','category','class','sub','top'].find(s => {
+    const el = document.getElementById('asec-' + s);
+    return el && el.style.display !== 'none';
+  }) || 'monthly';
+
+  if (visible === 'monthly')  drawMonthlySection(pure, currentMonth);
+  if (visible === 'category') drawCategorySection(pure);
+  if (visible === 'class')    drawClassSection(pure);
+  if (visible === 'sub')      drawSubSection(pure);
+  if (visible === 'top')      drawTop10Section(allData, currentMonth);
+}
+
+// ── Monthly section ──────────────────────────────────────
+function drawMonthlySection(data, currentMonth) {
+  const monthMap = {};
+  data.forEach(r => {
+    if (!r.Date) return;
+    const mo = r.Date.substring(0, 7);
+    monthMap[mo] = (monthMap[mo] || 0) + (Number(r.Amount) || 0);
+  });
+
+  const months = Object.keys(monthMap).sort();
+  const vals   = months.map(m => monthMap[m]);
+
+  const ctx = document.getElementById('monthlyAnalysisChart').getContext('2d');
+  if (monthlyChartInst) { monthlyChartInst.destroy(); monthlyChartInst = null; }
+
+  if (!months.length) {
+    document.getElementById('monthly-analysis-table').innerHTML =
+      '<p style="text-align:center;color:#B0B8C1;padding:20px;">데이터 없음</p>';
+    return;
+  }
+
+  monthlyChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months.map(m => {
+        const [y, mo] = m.split('-');
+        return `${y.slice(2)}.${mo}`;
+      }),
+      datasets: [{
+        data: vals,
+        backgroundColor: months.map(m => m === currentMonth ? '#0064FF' : '#C2D4FF'),
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => '₩' + c.raw.toLocaleString('ko-KR') } }
+      },
+      scales: {
+        x: { grid: { display: false }, border: { display: false },
+             ticks: { font: { size: 10 }, color: '#8B95A1', maxRotation: 0 } },
+        y: { beginAtZero: true, grid: { color: '#F5F6F8' }, border: { display: false },
+             ticks: { font: { size: 10 }, color: '#8B95A1',
+               callback: v => v >= 10000 ? (v/10000).toFixed(0) + '만' : v } }
+      }
+    }
+  });
+
+  // Summary table (newest first)
+  const total = vals.reduce((s, v) => s + v, 0);
+  const avg   = months.length ? Math.round(total / months.length) : 0;
+
+  const rows = [...months].reverse().map(m => {
+    const [y, mo] = m.split('-');
+    const amt     = monthMap[m];
+    const count   = data.filter(r => r.Date && r.Date.startsWith(m)).length;
+    const isCur   = m === currentMonth;
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between;
+                  padding:10px 0; border-bottom:1px solid #F5F6F8;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="width:6px; height:6px; border-radius:50%; flex-shrink:0;
+                       background:${isCur ? '#0064FF' : 'transparent'};
+                       border:${isCur ? 'none' : '1px solid #E5E8EB'};"></span>
+          <span style="font-size:13px; font-weight:${isCur?'800':'600'};
+                       color:${isCur?'#0064FF':'#3D4D5C'};">${y}년 ${parseInt(mo)}월</span>
+          <span style="font-size:11px; color:#B0B8C1;">${count}건</span>
+        </div>
+        <span style="font-size:14px; font-weight:800; letter-spacing:-0.5px;
+                     color:${isCur?'#0064FF':'#191F28'};">₩${amt.toLocaleString('ko-KR')}</span>
+      </div>`;
+  }).join('');
+
+  document.getElementById('monthly-analysis-table').innerHTML = `
+    ${rows}
+    <div style="display:flex; justify-content:space-between; padding:12px 0 2px; margin-top:2px;">
+      <span style="font-size:12px; font-weight:600; color:#8B95A1;">월 평균</span>
+      <span style="font-size:14px; font-weight:800; color:#3D4D5C;">₩${avg.toLocaleString('ko-KR')}</span>
+    </div>`;
+}
+
+// ── Category section ─────────────────────────────────────
+function drawCategorySection(data) {
+  const catMap = {};
+  data.forEach(r => {
+    const cat = r.Category || '기타';
+    catMap[cat] = (catMap[cat] || 0) + (Number(r.Amount) || 0);
+  });
+
+  const sorted = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+  const total  = sorted.reduce((s, [, v]) => s + v, 0);
+
+  const ctx = document.getElementById('catDonutChart').getContext('2d');
+  if (catChartInst) { catChartInst.destroy(); catChartInst = null; }
+
+  if (!sorted.length) {
+    document.getElementById('cat-analysis-bars').innerHTML =
+      '<p style="text-align:center;color:#B0B8C1;padding:20px;">데이터 없음</p>';
+    return;
+  }
+
+  const colors = sorted.map(([cat]) => getCat(cat).color);
+
+  catChartInst = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: sorted.map(([cat]) => cat),
+      datasets: [{
+        data: sorted.map(([, v]) => v),
+        backgroundColor: colors.map(c => c + 'BF'),
+        borderColor: colors,
+        borderWidth: 2,
+        hoverOffset: 10,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => {
+              const pct = total > 0 ? ((c.raw / total) * 100).toFixed(1) : 0;
+              return ` ₩${c.raw.toLocaleString('ko-KR')} (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const max = sorted[0][1];
+  document.getElementById('cat-analysis-bars').innerHTML = sorted.map(([cat, amt]) => {
+    const c    = getCat(cat);
+    const pct  = total > 0 ? ((amt / total) * 100).toFixed(1) : 0;
+    const barW = max > 0 ? ((amt / max) * 100).toFixed(0) : 0;
+    return `
+      <div style="display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #F5F6F8;">
+        <div class="cat-icon-sm" style="background:${c.bg}; flex-shrink:0;">${c.icon}</div>
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <span style="font-size:12px; font-weight:600; color:#3D4D5C; white-space:nowrap;
+                         overflow:hidden; text-overflow:ellipsis; max-width:150px;">${cat}</span>
+            <span style="font-size:13px; font-weight:800; color:#191F28; letter-spacing:-0.3px;
+                         flex-shrink:0; margin-left:8px;">₩${amt.toLocaleString('ko-KR')}</span>
+          </div>
+          <div class="prog-bar">
+            <div class="prog-fill" style="width:${barW}%; background:${c.color}; opacity:0.75;"></div>
+          </div>
+        </div>
+        <span style="font-size:11px; font-weight:800; color:${c.color}; width:40px;
+                     text-align:right; flex-shrink:0;">${pct}%</span>
+      </div>`;
+  }).join('');
+}
+
+// ── Class (분류) section ─────────────────────────────────
+function drawClassSection(data) {
+  const clsMap = {};
+  data.forEach(r => {
+    const cls = r.Class || '미분류';
+    clsMap[cls] = (clsMap[cls] || 0) + (Number(r.Amount) || 0);
+  });
+
+  const sorted = Object.entries(clsMap).sort((a, b) => b[1] - a[1]);
+  const total  = sorted.reduce((s, [, v]) => s + v, 0);
+  const max    = sorted.length ? sorted[0][1] : 1;
+  const COLS   = ['#0064FF','#4CAF50','#FF8A00','#9C27B0','#E53E3E','#00BCD4','#FF5722','#607D8B'];
+
+  document.getElementById('class-analysis-bars').innerHTML = sorted.length
+    ? sorted.map(([cls, amt], i) => {
+        const pct   = total > 0 ? ((amt / total) * 100).toFixed(1) : 0;
+        const barW  = max  > 0 ? ((amt / max)   * 100).toFixed(0) : 0;
+        const col   = COLS[i % COLS.length];
+        const count = data.filter(r => r.Class === cls).length;
+        return `
+          <div style="padding:11px 0; border-bottom:1px solid #F5F6F8;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="width:10px; height:10px; border-radius:50%; background:${col};
+                             display:inline-block; flex-shrink:0;"></span>
+                <span style="font-size:13px; font-weight:700; color:#191F28;">${cls}</span>
+                <span style="font-size:11px; color:#B0B8C1;">${count}건</span>
+              </div>
+              <div>
+                <span style="font-size:14px; font-weight:800; color:#191F28;
+                             letter-spacing:-0.5px;">₩${amt.toLocaleString('ko-KR')}</span>
+                <span style="font-size:11px; font-weight:600; color:${col};
+                             margin-left:6px;">${pct}%</span>
+              </div>
+            </div>
+            <div class="prog-bar">
+              <div class="prog-fill" style="width:${barW}%; background:${col};"></div>
+            </div>
+          </div>`;
+      }).join('')
+    : '<p style="text-align:center;color:#B0B8C1;padding:20px;">데이터 없음</p>';
+}
+
+// ── SubCategory (구매처) section ─────────────────────────
+function drawSubSection(data) {
+  const subMap = {};
+  data.forEach(r => {
+    const sub = r.SubCategory || '미분류';
+    subMap[sub] = (subMap[sub] || 0) + (Number(r.Amount) || 0);
+  });
+
+  const all    = Object.entries(subMap).sort((a, b) => b[1] - a[1]);
+  const sorted = all.slice(0, 15);
+  const total  = all.reduce((s, [, v]) => s + v, 0);
+  const max    = sorted.length ? sorted[0][1] : 1;
+
+  document.getElementById('sub-analysis-bars').innerHTML = sorted.length
+    ? sorted.map(([sub, amt]) => {
+        const pct   = total > 0 ? ((amt / total) * 100).toFixed(1) : 0;
+        const barW  = max   > 0 ? ((amt / max)   * 100).toFixed(0) : 0;
+        const count = data.filter(r => (r.SubCategory || '미분류') === sub).length;
+        return `
+          <div style="padding:10px 0; border-bottom:1px solid #F5F6F8;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; font-weight:700; color:#191F28;">${sub}</span>
+                <span style="font-size:11px; color:#B0B8C1;">${count}건</span>
+              </div>
+              <div>
+                <span style="font-size:14px; font-weight:800; color:#191F28;
+                             letter-spacing:-0.5px;">₩${amt.toLocaleString('ko-KR')}</span>
+                <span style="font-size:11px; font-weight:600; color:#8B95A1;
+                             margin-left:6px;">${pct}%</span>
+              </div>
+            </div>
+            <div class="prog-bar">
+              <div class="prog-fill" style="width:${barW}%; background:#0064FF; opacity:0.7;"></div>
+            </div>
+          </div>`;
+      }).join('')
+    : '<p style="text-align:center;color:#B0B8C1;padding:20px;">데이터 없음</p>';
+}
+
+// ── TOP 10 section ───────────────────────────────────────
+function drawTop10Section(data, currentMonth) {
+  const [y, mo] = currentMonth.split('-');
+  document.getElementById('top10-month-label').innerText = `${y}년 ${parseInt(mo)}월`;
+
+  const moData = data
+    .filter(r => r.Date && r.Date.startsWith(currentMonth))
+    .sort((a, b) => (Number(b.Amount) || 0) - (Number(a.Amount) || 0))
+    .slice(0, 10);
+
+  const medals = ['🥇', '🥈', '🥉'];
+
+  document.getElementById('top10-list').innerHTML = moData.length
+    ? moData.map((r, i) => {
+        const amt  = Number(r.Amount) || 0;
+        const cat  = getCat(r.Category);
+        const rank = i < 3
+          ? `<span style="font-size:20px; line-height:1;">${medals[i]}</span>`
+          : `<span style="font-size:13px; font-weight:800; color:#8B95A1; width:26px;
+                          text-align:center; display:inline-block;">${i + 1}</span>`;
+        const dateStr = r.Date ? r.Date.substring(5, 10).replace('-', '/') : '';
+        return `
+          <div style="display:flex; align-items:center; gap:12px; padding:11px 0;
+                      border-bottom:1px solid #F5F6F8;">
+            <span style="width:26px; text-align:center; flex-shrink:0;">${rank}</span>
+            <div class="cat-icon-sm" style="background:${cat.bg}; flex-shrink:0;">${cat.icon}</div>
+            <div style="flex:1; min-width:0;">
+              <p style="font-size:13px; font-weight:700; color:#191F28; margin-bottom:3px;
+                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${r.Item || r.SubCategory || '내용 없음'}
+              </p>
+              <p style="font-size:11px; color:#8B95A1;">
+                ${r.Category || ''} · ${dateStr}${r.SubCategory ? ' · ' + r.SubCategory : ''}
+              </p>
+            </div>
+            <span style="font-size:14px; font-weight:800; color:#191F28;
+                         letter-spacing:-0.5px; flex-shrink:0;">₩${amt.toLocaleString('ko-KR')}</span>
+          </div>`;
+      }).join('')
+    : `<div style="text-align:center; padding:32px 0; color:#B0B8C1;">
+         <p style="font-size:32px; margin-bottom:8px;">📭</p>
+         <p style="font-weight:600; font-size:13px;">${parseInt(mo)}월 데이터 없음</p>
+       </div>`;
+}
 
 // ── Init ─────────────────────────────────────────────────
 loadData();
