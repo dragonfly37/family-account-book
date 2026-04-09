@@ -436,6 +436,9 @@
       <select id="filterCategory" onchange="applyFilters()" class="chip">
         <option value="">🏷️ 카테고리</option>
       </select>
+      <select id="filterSubCategory" onchange="applyFilters()" class="chip">
+        <option value="">📍 구매처</option>
+      </select>
       <select id="filterSettlement" onchange="applyFilters()" class="chip">
         <option value="">💳 정산</option>
       </select>
@@ -577,9 +580,11 @@ async function loadData() {
       populateDropdown('category',    entities.Category);
       populateDropdown('subCategory', entities.Settlement);  // 실제로는 구매처 목록
       populateDropdown('settlement',  entities.Closed);      // 실제로는 정산상태 목록
-      populateFilterSelect('filterClass',      entities.Class,      '👤 분류');
-      populateFilterSelect('filterCategory',   entities.Category,   '🏷️ 카테고리');
-      populateFilterSelect('filterSettlement', entities.Closed,     '💳 정산');  // 실제 정산상태
+      populateFilterSelect('filterClass',       entities.Class,      '👤 분류');
+      populateFilterSelect('filterCategory',    entities.Category,   '🏷️ 카테고리');
+      populateFilterSelect('filterSubCategory', entities.Settlement, '📍 구매처');
+      populateFilterSelect('filterSettlement',  entities.Closed,     '💳 정산');
+      setFormDefaults(); // 기본값 세팅
     }
     applyFilters();
   } catch (e) {
@@ -611,6 +616,17 @@ function populateFilterSelect(id, arr, placeholder) {
   });
 }
 
+// ── Form defaults ────────────────────────────────────────
+function setFormDefaults() {
+  if (document.getElementById('editId').value) return; // 수정 모드면 건너뜀
+  const setDefault = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && [...el.options].some(o => o.value === val)) el.value = val;
+  };
+  setDefault('class',      '공용카드(쿠팡)');
+  setDefault('settlement', '정산 필요');
+}
+
 // ── Chip filter ──────────────────────────────────────────
 function setChipFilter(type) {
   activeChipFilter = type;
@@ -619,7 +635,7 @@ function setChipFilter(type) {
   applyFilters();
 }
 function resetFilters() {
-  ['filterDate','filterClass','filterCategory','filterSettlement','filterClosed']
+  ['filterDate','filterClass','filterCategory','filterSubCategory','filterSettlement','filterClosed']
     .forEach(id => document.getElementById(id).value = '');
   activeChipFilter = 'all';
   document.getElementById('chip-all').classList.add('active');
@@ -633,6 +649,7 @@ function applyFilters() {
   const sort  = document.getElementById('sortSelector').value;
   const fCls  = document.getElementById('filterClass').value;
   const fCat  = document.getElementById('filterCategory').value;
+  const fSub  = document.getElementById('filterSubCategory').value;
   const fSt   = document.getElementById('filterSettlement').value;
 
   renderDashboard(allData, month);
@@ -640,6 +657,7 @@ function applyFilters() {
   let filtered = allData.filter(r => r.Date && r.Date.startsWith(month));
   if (fCls) filtered = filtered.filter(r => r.Class === fCls);
   if (fCat) filtered = filtered.filter(r => r.Category === fCat);
+  if (fSub) filtered = filtered.filter(r => r.SubCategory === fSub);
   if (fSt)  filtered = filtered.filter(r => r.Settlement === fSt);
   if (activeChipFilter === 'pending')
     filtered = filtered.filter(r => r.Settlement &&
@@ -889,6 +907,7 @@ function cancelEdit() {
   document.getElementById('submitBtn').className  = 'btn-primary';
   document.getElementById('submitBtn').innerText   = '저장하기';
   document.getElementById('cancelEditBtn').classList.add('hidden');
+  setFormDefaults(); // 취소 후 기본값 복원
 }
 
 // ── Submit ───────────────────────────────────────────────
