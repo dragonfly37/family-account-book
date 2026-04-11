@@ -538,9 +538,24 @@
     <!-- ── 섹션: TOP10 ── -->
     <div id="asec-top" class="asec" style="display:none;">
       <div class="card" style="padding:18px 20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <p style="font-size:12px; font-weight:700; color:#8B95A1;">선택 월 TOP 10 지출</p>
           <span id="top10-month-label" style="font-size:11px; font-weight:700; color:#0064FF; background:#EBF4FF; padding:3px 8px; border-radius:20px;"></span>
+        </div>
+        <!-- 뷰 필터 칩 -->
+        <div style="display:flex; gap:6px; margin-bottom:16px;">
+          <button id="top10-chip-all" onclick="switchTop10View('all')"
+            style="flex:1; padding:8px 0; border-radius:20px; font-size:11px; font-weight:700;
+                   border:1.5px solid #0064FF; background:#EBF4FF; color:#0064FF;
+                   cursor:pointer; font-family:inherit; transition:all 0.15s;">전체</button>
+          <button id="top10-chip-budget" onclick="switchTop10View('budget')"
+            style="flex:1; padding:8px 0; border-radius:20px; font-size:11px; font-weight:700;
+                   border:1.5px solid #E5E8EB; background:white; color:#8B95A1;
+                   cursor:pointer; font-family:inherit; transition:all 0.15s;">🎯 목표 포함</button>
+          <button id="top10-chip-nonbudget" onclick="switchTop10View('nonbudget')"
+            style="flex:1; padding:8px 0; border-radius:20px; font-size:11px; font-weight:700;
+                   border:1.5px solid #E5E8EB; background:white; color:#8B95A1;
+                   cursor:pointer; font-family:inherit; transition:all 0.15s;">📦 목표 제외</button>
         </div>
         <div id="top10-list"></div>
       </div>
@@ -1064,6 +1079,7 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
 let analysisScope     = 'all';
 let monthlyChartInst  = null;
 let catChartInst      = null;
+let top10View         = 'all'; // 'all' | 'budget' | 'nonbudget'
 
 // ── Budget targets ────────────────────────────────────────
 // 예산 집계 대상 카테고리 (reference 시트 기준 7개)
@@ -1531,13 +1547,31 @@ function drawSubSection(data) {
     : '<p style="text-align:center;color:#B0B8C1;padding:20px;">데이터 없음</p>';
 }
 
+// ── TOP 10 view switcher ─────────────────────────────────
+function switchTop10View(view) {
+  top10View = view;
+  ['all', 'budget', 'nonbudget'].forEach(v => {
+    const btn = document.getElementById('top10-chip-' + v);
+    if (!btn) return;
+    const active = v === view;
+    btn.style.background   = active ? '#EBF4FF' : 'white';
+    btn.style.color        = active ? '#0064FF' : '#8B95A1';
+    btn.style.borderColor  = active ? '#0064FF' : '#E5E8EB';
+  });
+  renderAnalysis();
+}
+
 // ── TOP 10 section ───────────────────────────────────────
 function drawTop10Section(data, currentMonth) {
   const [y, mo] = currentMonth.split('-');
   document.getElementById('top10-month-label').innerText = `${y}년 ${parseInt(mo)}월`;
 
-  const moData = data
-    .filter(r => r.Date && r.Date.startsWith(currentMonth))
+  // 선택 월 필터 → 뷰에 따라 카테고리 필터 추가
+  let moData = data.filter(r => r.Date && r.Date.startsWith(currentMonth));
+  if (top10View === 'budget')    moData = moData.filter(r => BUDGET_CATEGORIES.has(r.Category));
+  if (top10View === 'nonbudget') moData = moData.filter(r => !BUDGET_CATEGORIES.has(r.Category));
+
+  moData = moData
     .sort((a, b) => (Number(b.Amount) || 0) - (Number(a.Amount) || 0))
     .slice(0, 10);
 
@@ -1572,7 +1606,7 @@ function drawTop10Section(data, currentMonth) {
       }).join('')
     : `<div style="text-align:center; padding:32px 0; color:#B0B8C1;">
          <p style="font-size:32px; margin-bottom:8px;">📭</p>
-         <p style="font-weight:600; font-size:13px;">${parseInt(mo)}월 데이터 없음</p>
+         <p style="font-weight:600; font-size:13px;">${parseInt(mo)}월 해당 데이터 없음</p>
        </div>`;
 }
 
