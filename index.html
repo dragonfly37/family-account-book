@@ -1066,6 +1066,12 @@ let monthlyChartInst  = null;
 let catChartInst      = null;
 
 // ── Budget targets ────────────────────────────────────────
+// 예산 집계 대상 카테고리 (reference 시트 기준 7개)
+const BUDGET_CATEGORIES = new Set([
+  '1. 식자재', '2. 생필품', '3. 외식/커피',
+  '4. 쇼핑', '5. 기타', '6. 주유/차량', '7. 문화'
+]);
+
 const DEFAULT_BUDGET = {1:1200000,2:750000,3:750000,4:750000,5:750000,6:750000,
                          7:750000,8:750000,9:750000,10:750000,11:750000,12:750000};
 let budgetTargets = (() => {
@@ -1211,8 +1217,11 @@ function drawMonthlySection(data, currentMonth) {
 
 // ── Budget vs Actual ─────────────────────────────────────
 function drawBudgetSection(data, currentMonth) {
+  // 예산 집계 대상 7개 카테고리만 필터
+  const budgetData = data.filter(r => BUDGET_CATEGORIES.has(r.Category));
+
   const monthMap = {};
-  data.forEach(r => {
+  budgetData.forEach(r => {
     if (!r.Date) return;
     const mo = r.Date.substring(0, 7);
     monthMap[mo] = (monthMap[mo] || 0) + (Number(r.Amount) || 0);
