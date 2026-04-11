@@ -490,9 +490,20 @@
         <p style="font-size:12px; font-weight:700; color:#8B95A1; margin-bottom:14px;">월별 순수 지출 추이</p>
         <div style="position:relative; height:180px;"><canvas id="monthlyAnalysisChart"></canvas></div>
       </div>
-      <div class="card" style="padding:18px 20px;">
+      <div class="card" style="padding:18px 20px; margin-bottom:10px;">
         <p style="font-size:12px; font-weight:700; color:#8B95A1; margin-bottom:10px;">월별 상세</p>
         <div id="monthly-analysis-table"></div>
+      </div>
+      <!-- 예산 vs 실제 카드 -->
+      <div class="card" style="padding:18px 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <p style="font-size:12px; font-weight:700; color:#8B95A1;">🎯 예산 vs 실제</p>
+          <button onclick="toggleBudgetEdit()" id="budgetEditBtn"
+            style="font-size:11px; font-weight:700; color:#0064FF; background:#EBF4FF;
+                   border:none; padding:5px 10px; border-radius:20px; cursor:pointer; font-family:inherit;">✏️ 수정</button>
+        </div>
+        <div id="budget-table"></div>
+        <div id="budget-edit-panel" style="display:none; margin-top:12px; border-top:1px solid #F5F6F8; padding-top:14px;"></div>
       </div>
     </div>
 
@@ -1054,6 +1065,19 @@ let analysisScope     = 'all';
 let monthlyChartInst  = null;
 let catChartInst      = null;
 
+// ── Budget targets ────────────────────────────────────────
+const DEFAULT_BUDGET = {1:1200000,2:750000,3:750000,4:750000,5:750000,6:750000,
+                         7:750000,8:750000,9:750000,10:750000,11:750000,12:750000};
+let budgetTargets = (() => {
+  try {
+    const s = localStorage.getItem('budgetTargets');
+    return s ? JSON.parse(s) : { ...DEFAULT_BUDGET };
+  } catch { return { ...DEFAULT_BUDGET }; }
+})();
+function saveBudgetTargets() {
+  try { localStorage.setItem('budgetTargets', JSON.stringify(budgetTargets)); } catch {}
+}
+
 // ── Scope toggle ─────────────────────────────────────────
 function setAnalysisScope(scope) {
   analysisScope = scope;
@@ -1094,7 +1118,7 @@ function renderAnalysis() {
     return el && el.style.display !== 'none';
   }) || 'monthly';
 
-  if (visible === 'monthly')  drawMonthlySection(pure, currentMonth);
+  if (visible === 'monthly')  { drawMonthlySection(pure, currentMonth); drawBudgetSection(pure, currentMonth); }
   if (visible === 'category') drawCategorySection(pure);
   if (visible === 'class')    drawClassSection(pure);
   if (visible === 'sub')      drawSubSection(pure);
@@ -1183,6 +1207,160 @@ function drawMonthlySection(data, currentMonth) {
       <span style="font-size:12px; font-weight:600; color:#8B95A1;">월 평균</span>
       <span style="font-size:14px; font-weight:800; color:#3D4D5C;">₩${avg.toLocaleString('ko-KR')}</span>
     </div>`;
+}
+
+// ── Budget vs Actual ─────────────────────────────────────
+function drawBudgetSection(data, currentMonth) {
+  const monthMap = {};
+  data.forEach(r => {
+    if (!r.Date) return;
+    const mo = r.Date.substring(0, 7);
+    monthMap[mo] = (monthMap[mo] || 0) + (Number(r.Amount) || 0);
+  });
+
+  const months = Object.keys(monthMap).sort();
+  if (!months.length) {
+    document.getElementById('budget-table').innerHTML =
+      '<p style="text-align:center;color:#B0B8C1;padding:12px;">데이터 없음</p>';
+    return;
+  }
+
+  // Cumulative summary
+  let totalActual = 0, totalTarget = 0;
+  months.forEach(m => {
+    const moNum = parseInt(m.split('-')[1]);
+    totalActual += monthMap[m];
+    totalTarget += (budgetTargets[moNum] || 750000);
+  });
+  const totalGap  = totalActual - totalTarget;
+  const totalOver = totalGap > 0;
+
+  const summaryBar = `
+    <div style="background:${totalOver ? '#FFF5F5' : '#F0FAF2'}; border-radius:12px; padding:12px 14px;
+                margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <p style="font-size:11px; font-weight:600; color:#8B95A1; margin-bottom:3px;">${months.length}개월 누적</p>
+        <p style="font-size:16px; font-weight:900; letter-spacing:-0.5px; color:${totalOver ? '#E53E3E' : '#2E7D32'};">
+          ${totalOver ? '▲ +' : '▼ -'}₩${Math.abs(totalGap).toLocaleString('ko-KR')}
+        </p>
+        <p style="font-size:11px; color:${totalOver ? '#E53E3E' : '#2E7D32'}; font-weight:600; margin-top:2px;">
+          목표 대비 ${totalOver ? '초과' : '절약'}
+        </p>
+      </div>
+      <div style="text-align:right;">
+        <p style="font-size:11px; color:#8B95A1; margin-bottom:3px;">목표 ₩${totalTarget.toLocaleString('ko-KR')}</p>
+        <p style="font-size:11px; color:#8B95A1;">실제 ₩${totalActual.toLocaleString('ko-KR')}</p>
+      </div>
+    </div>`;
+
+  const rows = [...months].reverse().map(m => {
+    const [y, mo] = m.split('-');
+    const moNum   = parseInt(mo);
+    const actual  = monthMap[m];
+    const target  = budgetTargets[moNum] || 750000;
+    const gap     = actual - target;
+    const over    = gap > 0;
+    const isCur   = m === currentMonth;
+    const fillPct = Math.min((actual / target) * 100, 100).toFixed(0);
+    const gapPct  = target > 0 ? Math.abs((gap / target) * 100).toFixed(0) : 0;
+
+    return `
+      <div style="padding:11px 0; border-bottom:1px solid #F5F6F8;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+          <div style="display:flex; align-items:center; gap:7px;">
+            <span style="width:6px; height:6px; border-radius:50%; flex-shrink:0;
+                         background:${isCur ? '#0064FF' : 'transparent'};
+                         border:${isCur ? 'none' : '1px solid #E5E8EB'};"></span>
+            <span style="font-size:13px; font-weight:${isCur ? '800' : '600'};
+                         color:${isCur ? '#0064FF' : '#3D4D5C'};">${y}년 ${moNum}월</span>
+          </div>
+          <span style="font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px;
+                       background:${over ? '#FFF0F0' : '#F0FAF2'}; color:${over ? '#E53E3E' : '#2E7D32'};">
+            ${over ? '▲ +' : '▼ -'}${gapPct}%
+          </span>
+        </div>
+        <div style="display:flex; gap:10px; font-size:11px; color:#8B95A1; margin-bottom:7px; flex-wrap:wrap;">
+          <span>목표 <strong style="color:#3D4D5C;">₩${target.toLocaleString('ko-KR')}</strong></span>
+          <span style="color:#D0D5DD;">·</span>
+          <span>실제 <strong style="color:${over ? '#E53E3E' : '#2E7D32'};">₩${actual.toLocaleString('ko-KR')}</strong></span>
+          <span style="color:#D0D5DD;">·</span>
+          <span>차이 <strong style="color:${over ? '#E53E3E' : '#2E7D32'};">${over ? '+' : '-'}₩${Math.abs(gap).toLocaleString('ko-KR')}</strong></span>
+        </div>
+        <div class="prog-bar" style="height:7px;">
+          <div class="prog-fill" style="width:${fillPct}%; background:${over ? '#E53E3E' : '#4CAF50'};"></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('budget-table').innerHTML = summaryBar + rows;
+}
+
+// ── Budget edit UI ────────────────────────────────────────
+function toggleBudgetEdit() {
+  const panel = document.getElementById('budget-edit-panel');
+  const btn   = document.getElementById('budgetEditBtn');
+  const isOpen = panel.style.display !== 'none';
+
+  if (isOpen) {
+    panel.style.display = 'none';
+    btn.innerText = '✏️ 수정';
+    btn.style.background = '#EBF4FF';
+    btn.style.color = '#0064FF';
+    return;
+  }
+
+  const MO_NAMES = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  panel.innerHTML = `
+    <p style="font-size:12px; font-weight:700; color:#8B95A1; margin-bottom:12px;">월별 목표 금액 설정</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+      ${MO_NAMES.map((name, i) => {
+        const mo = i + 1;
+        return `
+          <div>
+            <label style="font-size:11px; font-weight:600; color:#8B95A1; display:block; margin-bottom:4px;">${name}</label>
+            <div style="position:relative;">
+              <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%);
+                           font-size:12px; color:#8B95A1; font-weight:700; pointer-events:none;">₩</span>
+              <input type="number" id="budget-mo-${mo}" value="${budgetTargets[mo] || 750000}"
+                style="width:100%; padding:8px 8px 8px 24px; border:1.5px solid #E5E8EB; border-radius:10px;
+                       font-size:13px; font-weight:700; color:#191F28; background:white; font-family:inherit;
+                       -webkit-appearance:none;"
+                inputmode="numeric" step="10000">
+            </div>
+          </div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="applyBudgetEdit()"
+        style="flex:1; background:#0064FF; color:white; font-size:14px; font-weight:700;
+               padding:13px; border-radius:12px; border:none; cursor:pointer; font-family:inherit;">저장</button>
+      <button onclick="resetBudgetToDefault()"
+        style="background:#F5F6F8; color:#8B95A1; font-size:13px; font-weight:600;
+               padding:13px 16px; border-radius:12px; border:none; cursor:pointer; font-family:inherit;">초기화</button>
+    </div>`;
+
+  panel.style.display = 'block';
+  btn.innerText = '✕ 닫기';
+  btn.style.background = '#F5F6F8';
+  btn.style.color = '#8B95A1';
+}
+
+function applyBudgetEdit() {
+  for (let mo = 1; mo <= 12; mo++) {
+    const el = document.getElementById('budget-mo-' + mo);
+    if (el) budgetTargets[mo] = Math.max(0, Number(el.value) || 0);
+  }
+  saveBudgetTargets();
+  toggleBudgetEdit();
+  renderAnalysis();
+}
+
+function resetBudgetToDefault() {
+  if (!confirm('목표 금액을 기본값으로 초기화할까요?\n(1월 120만원 / 2~12월 75만원)')) return;
+  budgetTargets = { ...DEFAULT_BUDGET };
+  saveBudgetTargets();
+  toggleBudgetEdit();
+  renderAnalysis();
 }
 
 // ── Category section ─────────────────────────────────────
