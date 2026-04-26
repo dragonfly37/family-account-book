@@ -597,6 +597,26 @@ let weeklyChart = null;
 let allData = [];
 let activeChipFilter = 'all';
 
+// ── 타임존 안전 날짜 유틸 ────────────────────────────────
+// API가 "2026-04-25T15:00:00.000Z" 같은 UTC ISO 문자열을 반환할 때
+// split('T')[0]으로 자르면 UTC 날짜(KST 기준 하루 전)가 나오는 버그를 방지.
+// 항상 JS 로컬(getFullYear/Month/Date)로 변환해 로컬 날짜 문자열을 반환.
+function toLocalDateStr(dateVal) {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d)) return String(dateVal).substring(0, 10);
+  const y  = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${dy}`;
+}
+// YYYY-MM-DD 문자열 → 로컬 자정 Date 객체 (요일 계산 등에 사용)
+function parseLocalDate(ymd) {
+  if (!ymd) return new Date(NaN);
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 // ── Category config ─────────────────────────────────────
 const CAT_CFG = {
   '1. 식자재':            { icon: '🥦', bg: '#E8F5E9', color: '#2E7D32' },
@@ -782,7 +802,7 @@ function applyFilters() {
 
   renderDashboard(allData, month);
 
-  let filtered = allData.filter(r => r.Date && r.Date.startsWith(month));
+  let filtered = allData.filter(r => r.Date && toLocalDateStr(r.Date).startsWith(month));
   if (fCls) filtered = filtered.filter(r => r.Class === fCls);
   if (fCat) filtered = filtered.filter(r => r.Category === fCat);
   if (fSub) filtered = filtered.filter(r => r.SubCategory === fSub);
@@ -825,7 +845,7 @@ function renderList(data) {
   // Group by date
   const groups = {};
   data.forEach(r => {
-    const k = (r.Date || '').split('T')[0];
+    const k = toLocalDateStr(r.Date);
     if (!groups[k]) groups[k] = [];
     groups[k].push(r);
   });
@@ -833,7 +853,7 @@ function renderList(data) {
   const DAY_KO = ['일','월','화','수','목','금','토'];
 
   Object.entries(groups).forEach(([dateKey, rows]) => {
-    const d = new Date(dateKey);
+    const d = parseLocalDate(dateKey);
     const dayTotal = rows.reduce((s, r) => s + (Number(r.Amount)||0), 0);
     const dayStr = isNaN(d)
       ? dateKey
@@ -911,10 +931,10 @@ function renderDashboard(data, month) {
     const amt = Number(r.Amount)||0;
     if (r.Settlement && (r.Settlement.includes('정산 필요') || r.Settlement.includes('지급 대기')))
       pending += amt;
-    if (r.Date && r.Date.startsWith(month)) {
+    if (r.Date && toLocalDateStr(r.Date).startsWith(month)) {
       if (r.Class !== '제외(개인/저축/이자)' && r.Category !== '10. 저축/투자') {
         total += amt;
-        const day = new Date(r.Date).getDate();
+        const day = parseLocalDate(toLocalDateStr(r.Date)).getDate();
         weekly[`${Math.min(Math.ceil(day/7),5)}주`] += amt;
         catMap[r.Category||'기타'] = (catMap[r.Category||'기타']||0) + amt;
       }
@@ -1013,7 +1033,7 @@ function startEdit(id) {
   const row = allData.find(d => d.ID.toString() === id.toString());
   if (!row) return;
   document.getElementById('editId').value     = row.ID;
-  document.getElementById('date').value       = row.Date ? row.Date.split('T')[0] : '';
+  document.getElementById('date').value       = toLocalDateStr(row.Date);
   document.getElementById('amount').value     = row.Amount;
   document.getElementById('class').value      = row.Class;
   document.getElementById('category').value   = row.Category;
@@ -1127,7 +1147,7 @@ function renderAnalysis() {
   const currentMonth = document.getElementById('monthSelector').value;
 
   const base = analysisScope === 'month'
-    ? allData.filter(r => r.Date && r.Date.startsWith(currentMonth))
+    ? allData.filter(r => r.Date && toLocalDateStr(r.Date).startsWith(currentMonth))
     : allData;
 
   // "순수 지출" excludes savings & personal-exclusion class
@@ -1152,7 +1172,7 @@ function drawMonthlySection(data, currentMonth) {
   const monthMap = {};
   data.forEach(r => {
     if (!r.Date) return;
-    const mo = r.Date.substring(0, 7);
+    const mo = toLocalDateStr(r.Date).substring(0, 7);
     monthMap[mo] = (monthMap[mo] || 0) + (Number(r.Amount) || 0);
   });
 
@@ -1205,7 +1225,7 @@ function drawMonthlySection(data, currentMonth) {
   const rows = [...months].reverse().map(m => {
     const [y, mo] = m.split('-');
     const amt     = monthMap[m];
-    const count   = data.filter(r => r.Date && r.Date.startsWith(m)).length;
+    const count   = data.filter(r => r.Date && toLocalDateStr(r.Date).startsWith(m)).length;
     const isCur   = m === currentMonth;
     return `
       <div style="display:flex; align-items:center; justify-content:space-between;
@@ -1239,7 +1259,7 @@ function drawBudgetSection(data, currentMonth) {
   const monthMap = {};
   budgetData.forEach(r => {
     if (!r.Date) return;
-    const mo = r.Date.substring(0, 7);
+    const mo = toLocalDateStr(r.Date).substring(0, 7);
     monthMap[mo] = (monthMap[mo] || 0) + (Number(r.Amount) || 0);
   });
 
@@ -1567,7 +1587,7 @@ function drawTop10Section(data, currentMonth) {
   document.getElementById('top10-month-label').innerText = `${y}년 ${parseInt(mo)}월`;
 
   // 선택 월 필터 → 뷰에 따라 카테고리 필터 추가
-  let moData = data.filter(r => r.Date && r.Date.startsWith(currentMonth));
+  let moData = data.filter(r => r.Date && toLocalDateStr(r.Date).startsWith(currentMonth));
   if (top10View === 'budget')    moData = moData.filter(r => BUDGET_CATEGORIES.has(r.Category));
   if (top10View === 'nonbudget') moData = moData.filter(r => !BUDGET_CATEGORIES.has(r.Category));
 
@@ -1585,7 +1605,7 @@ function drawTop10Section(data, currentMonth) {
           ? `<span style="font-size:20px; line-height:1;">${medals[i]}</span>`
           : `<span style="font-size:13px; font-weight:800; color:#8B95A1; width:26px;
                           text-align:center; display:inline-block;">${i + 1}</span>`;
-        const dateStr = r.Date ? r.Date.substring(5, 10).replace('-', '/') : '';
+        const dateStr = r.Date ? toLocalDateStr(r.Date).substring(5, 10).replace('-', '/') : '';
         return `
           <div style="display:flex; align-items:center; gap:12px; padding:11px 0;
                       border-bottom:1px solid #F5F6F8;">
