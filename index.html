@@ -1029,15 +1029,12 @@ function renderCatBreakdown(catMap, total) {
 async function deleteRecord(id) {
   if (!confirm('정말 삭제하시겠습니까?')) return;
   try {
-    await fetch(API_URL, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      mode:'no-cors',
-      body: JSON.stringify({ action:'delete', id })
-    });
-    await new Promise(r => setTimeout(r, 1500));
+    const url = API_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action:'delete', id }));
+    const res    = await fetch(url);
+    const result = await res.json();
+    if (result.status !== 'success') throw new Error(result.error || '삭제 실패');
     loadData();
-  } catch(e) { alert('삭제 실패'); }
+  } catch(e) { alert('삭제 실패: ' + e.message); }
 }
 
 // ── Edit ─────────────────────────────────────────────────
@@ -1089,18 +1086,15 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
     Closed:      'Yes',  // 등록 시 자동 마감 처리
   };
   try {
-    await fetch(API_URL, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      mode:'no-cors',
-      body: JSON.stringify(payload)
-    });
+    const url    = API_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
+    const res    = await fetch(url);
+    const result = await res.json();
+    if (result.status !== 'success') throw new Error(result.error || '저장 실패');
     cancelEdit();
-    await new Promise(r => setTimeout(r, 1500));
     loadData();
     switchTab('home');
   } catch(e) {
-    alert('저장 실패했습니다.');
+    alert('저장 실패: ' + e.message);
   } finally {
     btn.innerText = orig; btn.disabled = false;
   }
@@ -1120,14 +1114,10 @@ async function triggerAnalysisUpdate() {
   textEl.innerText = '업데이트 중... (20~30초 소요)';
 
   try {
-    await fetch(API_URL, {
-      method:  'POST',
-      headers: {'Content-Type': 'text/plain;charset=utf-8'},
-      mode:    'no-cors',
-      body:    JSON.stringify({ action: 'updateAnalysis' })
-    });
-    // no-cors라 응답 못 읽음 — 30초 대기 후 완료 처리
-    await new Promise(r => setTimeout(r, 30000));
+    const url    = API_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'updateAnalysis' }));
+    const res    = await fetch(url);
+    const result = await res.json();
+    if (result.status !== 'success') throw new Error(result.error || '업데이트 실패');
     iconEl.innerText = '✅';
     textEl.innerText = '업데이트 완료!';
     setTimeout(() => {
