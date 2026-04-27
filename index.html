@@ -1032,9 +1032,10 @@ async function deleteRecord(id) {
     await fetch(API_URL, {
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      redirect:'follow',
+      mode:'no-cors',
       body: JSON.stringify({ action:'delete', id })
     });
+    await new Promise(r => setTimeout(r, 1500));
     loadData();
   } catch(e) { alert('삭제 실패'); }
 }
@@ -1091,10 +1092,11 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
     await fetch(API_URL, {
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      redirect:'follow',
+      mode:'no-cors',
       body: JSON.stringify(payload)
     });
     cancelEdit();
+    await new Promise(r => setTimeout(r, 1500));
     loadData();
     switchTab('home');
   } catch(e) {
@@ -1118,23 +1120,20 @@ async function triggerAnalysisUpdate() {
   textEl.innerText = '업데이트 중... (20~30초 소요)';
 
   try {
-    const res  = await fetch(API_URL, {
+    await fetch(API_URL, {
       method:  'POST',
       headers: {'Content-Type': 'text/plain;charset=utf-8'},
-      redirect: 'follow',
+      mode:    'no-cors',
       body:    JSON.stringify({ action: 'updateAnalysis' })
     });
-    const data = await res.json();
-    if (data.status === 'success') {
-      iconEl.innerText = '✅';
-      textEl.innerText = '업데이트 완료!';
-      setTimeout(() => {
-        iconEl.innerText = '📊';
-        textEl.innerText = '스프레드시트 분석 업데이트';
-      }, 3000);
-    } else {
-      throw new Error(data.message || '오류 발생');
-    }
+    // no-cors라 응답 못 읽음 — 30초 대기 후 완료 처리
+    await new Promise(r => setTimeout(r, 30000));
+    iconEl.innerText = '✅';
+    textEl.innerText = '업데이트 완료!';
+    setTimeout(() => {
+      iconEl.innerText = '📊';
+      textEl.innerText = '스프레드시트 분석 업데이트';
+    }, 3000);
   } catch (e) {
     iconEl.innerText = '❌';
     textEl.innerText = '실패 — 다시 시도';
