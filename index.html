@@ -89,6 +89,30 @@
     .nav-add-circle:active { transform: scale(0.92); }
     .nav-add-label { font-size: 10px; font-weight: 600; color: #B0B8C1; }
 
+    /* ── Toast ──────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 96px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: #191F28;
+      color: #fff;
+      padding: 11px 22px;
+      border-radius: 24px;
+      font-size: 14px;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      pointer-events: none;
+      z-index: 9999;
+      white-space: nowrap;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
     /* ── Cards ──────────────────────────────────── */
     .card {
       background: white;
@@ -596,6 +620,8 @@
     </button>
   </nav>
 
+  <div id="toast"></div>
+
 </div><!-- .app-wrap -->
 
 <!-- ════════════════════════════════════════
@@ -700,10 +726,20 @@ function onMonthChange() {
   if (document.getElementById('tab-analysis').classList.contains('active')) renderAnalysis();
 }
 
+// ── Toast ────────────────────────────────────────────────
+function showToast(msg, duration = 2000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
 // ── Load Data ────────────────────────────────────────────
-async function loadData() {
-  document.getElementById('loading').style.display = 'flex';
-  document.getElementById('recordList').innerHTML = '';
+async function loadData(silent = false) {
+  if (!silent) {
+    document.getElementById('loading').style.display = 'flex';
+    document.getElementById('recordList').innerHTML = '';
+  }
   try {
     const res = await fetch(API_URL + '?t=' + Date.now());
     const result = await res.json();
@@ -1090,9 +1126,11 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
     const res    = await fetch(url);
     const result = await res.json();
     if (result.status !== 'success') throw new Error(result.error || '저장 실패');
+    const isEdit = !!editId;
     cancelEdit();
-    loadData();
     switchTab('home');
+    showToast(isEdit ? '✅ 수정 완료!' : '✅ 저장 완료!');
+    loadData(true);
   } catch(e) {
     alert('저장 실패: ' + e.message);
   } finally {
