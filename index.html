@@ -1069,7 +1069,8 @@ async function deleteRecord(id) {
     const res    = await fetch(url);
     const result = await res.json();
     if (result.status !== 'success') throw new Error(result.error || '삭제 실패');
-    loadData();
+    allData = allData.filter(r => String(r.ID) !== String(id));
+    applyFilters();
   } catch(e) { alert('삭제 실패: ' + e.message); }
 }
 
@@ -1127,10 +1128,33 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
     const result = await res.json();
     if (result.status !== 'success') throw new Error(result.error || '저장 실패');
     const isEdit = !!editId;
+    const month  = payload.Date.slice(0, 7); // YYYY-MM
+
+    if (isEdit) {
+      const idx = allData.findIndex(r => String(r.ID) === String(editId));
+      if (idx !== -1) {
+        allData[idx] = { ...allData[idx],
+          Date: payload.Date, Month: month,
+          Class: payload.Class, Category: payload.Category,
+          SubCategory: payload.SubCategory, Item: payload.Item,
+          Amount: Number(payload.Amount), Settlement: payload.Settlement,
+          Closed: payload.Closed,
+        };
+      }
+    } else {
+      allData.push({
+        ID: result.id, Date: payload.Date, Month: month,
+        Class: payload.Class, Category: payload.Category,
+        SubCategory: payload.SubCategory, Item: payload.Item,
+        Amount: Number(payload.Amount), Settlement: payload.Settlement,
+        Closed: payload.Closed,
+      });
+    }
+
     cancelEdit();
     switchTab('home');
     showToast(isEdit ? '✅ 수정 완료!' : '✅ 저장 완료!');
-    loadData(true);
+    applyFilters(); // loadData(true) 대신 로컬 갱신 → 네트워크 요청 없음
   } catch(e) {
     alert('저장 실패: ' + e.message);
   } finally {
