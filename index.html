@@ -1064,14 +1064,19 @@ function renderCatBreakdown(catMap, total) {
 // ── Delete ───────────────────────────────────────────────
 async function deleteRecord(id) {
   if (!confirm('정말 삭제하시겠습니까?')) return;
+  const deleted = allData.find(r => String(r.ID) === String(id));
+  allData = allData.filter(r => String(r.ID) !== String(id));
+  applyFilters();
+  showToast('🗑️ 삭제 완료');
   try {
-    const url = API_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action:'delete', id }));
+    const url    = API_URL + '?payload=' + encodeURIComponent(JSON.stringify({ action:'delete', id }));
     const res    = await fetch(url);
     const result = await res.json();
     if (result.status !== 'success') throw new Error(result.error || '삭제 실패');
-    allData = allData.filter(r => String(r.ID) !== String(id));
-    applyFilters();
-  } catch(e) { alert('삭제 실패: ' + e.message); }
+  } catch(err) {
+    if (deleted) { allData.push(deleted); applyFilters(); }
+    showToast('❌ 삭제 실패 — 다시 시도해주세요');
+  }
 }
 
 // ── Edit ─────────────────────────────────────────────────
@@ -1107,9 +1112,6 @@ function cancelEdit() {
 // ── Submit ───────────────────────────────────────────────
 document.getElementById('recordForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const btn = document.getElementById('submitBtn');
-  const orig = btn.innerText;
-  btn.innerText = '저장 중...'; btn.disabled = true;
   const editId = document.getElementById('editId').value;
   const payload = {
     action: editId ? 'update' : 'create', id: editId,
@@ -1120,45 +1122,59 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
     SubCategory: document.getElementById('subCategory').value,
     Item:        document.getElementById('item').value,
     Settlement:  document.getElementById('settlement').value,
-    Closed:      'Yes',  // 등록 시 자동 마감 처리
+    Closed:      'Yes',
   };
+  const isEdit  = !!editId;
+  const month   = payload.Date.slice(0, 7);
+  const tempId  = String(Date.now());
+
+  // ── 낙관적 UI: GAS 응답 전에 즉시 반영 ──────────────────
+  let prevRecord = null;
+  if (isEdit) {
+    const idx = allData.findIndex(r => String(r.ID) === String(editId));
+    if (idx !== -1) {
+      prevRecord = { ...allData[idx] };
+      allData[idx] = { ...allData[idx],
+        Date: payload.Date, Month: month,
+        Class: payload.Class, Category: payload.Category,
+        SubCategory: payload.SubCategory, Item: payload.Item,
+        Amount: Number(payload.Amount), Settlement: payload.Settlement,
+        Closed: payload.Closed,
+      };
+    }
+  } else {
+    allData.push({
+      ID: tempId, Date: payload.Date, Month: month,
+      Class: payload.Class, Category: payload.Category,
+      SubCategory: payload.SubCategory, Item: payload.Item,
+      Amount: Number(payload.Amount), Settlement: payload.Settlement,
+      Closed: payload.Closed,
+    });
+  }
+  cancelEdit();
+  switchTab('home');
+  showToast(isEdit ? '✅ 수정 완료!' : '✅ 저장 완료!');
+  applyFilters();
+
+  // ── 백그라운드 GAS 저장 (실패 시 롤백) ──────────────────
   try {
     const url    = API_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
     const res    = await fetch(url);
     const result = await res.json();
     if (result.status !== 'success') throw new Error(result.error || '저장 실패');
-    const isEdit = !!editId;
-    const month  = payload.Date.slice(0, 7); // YYYY-MM
-
-    if (isEdit) {
-      const idx = allData.findIndex(r => String(r.ID) === String(editId));
-      if (idx !== -1) {
-        allData[idx] = { ...allData[idx],
-          Date: payload.Date, Month: month,
-          Class: payload.Class, Category: payload.Category,
-          SubCategory: payload.SubCategory, Item: payload.Item,
-          Amount: Number(payload.Amount), Settlement: payload.Settlement,
-          Closed: payload.Closed,
-        };
-      }
-    } else {
-      allData.push({
-        ID: result.id, Date: payload.Date, Month: month,
-        Class: payload.Class, Category: payload.Category,
-        SubCategory: payload.SubCategory, Item: payload.Item,
-        Amount: Number(payload.Amount), Settlement: payload.Settlement,
-        Closed: payload.Closed,
-      });
+    if (!isEdit && result.id) {
+      const idx = allData.findIndex(r => String(r.ID) === tempId);
+      if (idx !== -1) allData[idx].ID = result.id;
     }
-
-    cancelEdit();
-    switchTab('home');
-    showToast(isEdit ? '✅ 수정 완료!' : '✅ 저장 완료!');
-    applyFilters(); // loadData(true) 대신 로컬 갱신 → 네트워크 요청 없음
-  } catch(e) {
-    alert('저장 실패: ' + e.message);
-  } finally {
-    btn.innerText = orig; btn.disabled = false;
+  } catch(err) {
+    showToast('❌ 저장 실패 — 다시 시도해주세요');
+    if (isEdit && prevRecord) {
+      const idx = allData.findIndex(r => String(r.ID) === String(editId));
+      if (idx !== -1) allData[idx] = prevRecord;
+    } else {
+      allData = allData.filter(r => String(r.ID) !== tempId);
+    }
+    applyFilters();
   }
 });
 
