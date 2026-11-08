@@ -406,7 +406,7 @@
       <div class="card" style="padding:18px;">
         <div style="margin-bottom:14px;">
           <label class="form-label">📍 어디서?</label>
-          <select id="subCategory" class="form-input">
+          <select id="subCategory" required class="form-input">
             <option value="">불러오는 중...</option>
           </select>
         </div>
@@ -420,7 +420,7 @@
       <div class="card" style="padding:18px;">
         <div>
           <label class="form-label">💳 정산 상태</label>
-          <select id="settlement" class="form-input">
+          <select id="settlement" required class="form-input">
             <option value="">불러오는 중...</option>
           </select>
         </div>
@@ -708,11 +708,11 @@ function switchTab(tab) {
 
 // ── Month ────────────────────────────────────────────────
 const today = new Date();
-document.getElementById('date').valueAsDate = today;
+document.getElementById('date').value = toLocalDateStr(today); // UTC 기준이면 00~09시에 전날이 됨
 document.getElementById('todayDateDisplay').innerText =
   today.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
 
-const currentMonthStr = today.toISOString().substring(0, 7);
+const currentMonthStr = toLocalDateStr(today).substring(0, 7);
 document.getElementById('monthSelector').value = currentMonthStr;
 updateMonthLabel(currentMonthStr);
 
@@ -775,8 +775,10 @@ async function loadData(silent = false) {
 
 function populateDropdown(id, arr) {
   const el = document.getElementById(id);
-  el.innerHTML = '';
-  (arr || []).forEach(v => {
+  // 빈 선택지: 고르지 않으면 required 검사에 걸려 저장되지 않음
+  // (예전에는 첫 값 '1. 식자재'·'쿠팡'이 자동으로 저장되는 문제가 있었음)
+  el.innerHTML = '<option value="">선택하세요</option>';
+  (arr || []).filter(v => v !== '' && v != null).forEach(v => {
     const opt = document.createElement('option');
     opt.value = opt.textContent = v;
     el.appendChild(opt);
@@ -1101,7 +1103,7 @@ function startEdit(id) {
 function cancelEdit() {
   document.getElementById('recordForm').reset();
   document.getElementById('editId').value = '';
-  document.getElementById('date').valueAsDate = new Date();
+  document.getElementById('date').value = toLocalDateStr(new Date());
   document.getElementById('formTitle').innerText  = '새 지출 기록';
   document.getElementById('submitBtn').className  = 'btn-primary';
   document.getElementById('submitBtn').innerText   = '저장하기';
@@ -1122,7 +1124,10 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
     SubCategory: document.getElementById('subCategory').value,
     Item:        document.getElementById('item').value,
     Settlement:  document.getElementById('settlement').value,
-    Closed:      'Yes',
+    // 수정 시 기존 마감 여부 유지 (예전에는 항상 'Yes'로 덮어씀)
+    Closed:      editId
+      ? ((allData.find(r => String(r.ID) === String(editId)) || {}).Closed || 'Yes')
+      : 'Yes',
   };
   const isEdit  = !!editId;
   const month   = payload.Date.slice(0, 7);
