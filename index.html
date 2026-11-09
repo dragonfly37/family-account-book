@@ -319,12 +319,12 @@
 
       <div class="flex items-center justify-between">
         <div>
-          <p style="font-size:11px; color:#8B95A1; font-weight:500; margin-bottom:4px;">🔥 전체 미정산 (누적)</p>
+          <p style="font-size:11px; color:#8B95A1; font-weight:500; margin-bottom:4px;">🔥 받을 돈 미지급 (누적)</p>
           <p class="amount-lg" style="color:#E53E3E;" id="pendingAmount">₩0</p>
         </div>
         <button onclick="switchTab('list'); setChipFilter('pending')"
           style="font-size:12px; font-weight:700; color:#0064FF; background:#EBF4FF; border:none; padding:8px 14px; border-radius:20px; cursor:pointer;">
-          미정산 보기 →
+          정산 대기 보기 →
         </button>
       </div>
     </div>
@@ -453,7 +453,7 @@
     <!-- Filter chips -->
     <div class="chips-row" style="margin-bottom:14px;">
       <button class="chip active" id="chip-all" onclick="setChipFilter('all')">전체</button>
-      <button class="chip" id="chip-pending" onclick="setChipFilter('pending')">🔥 미정산</button>
+      <button class="chip" id="chip-pending" onclick="setChipFilter('pending')">🔥 정산 대기</button>
       <select id="filterClass" onchange="applyFilters()" class="chip">
         <option value="">👤 분류</option>
       </select>
@@ -680,16 +680,17 @@ function getCat(cat) {
   return CAT_CFG[key] || { icon: '💸', bg: '#F5F5F5', color: '#8B95A1' };
 }
 
+// 정산 상태 (Entity D열): 공용 지출 / 받을 돈 · 미지급 / 받을 돈 · 지급 완료 / 갚을 돈 · 미반환 / 갚을 돈 · 반환 완료
+// 옛 값(정산 필요 등)도 함께 인식
+const isUnpaid   = st => !!st && /미지급|정산 필요|지급 대기/.test(st);   // 개인이 받을 돈, 아직 못 받음
+const isUnreturn = st => !!st && /미반환/.test(st);                       // 개인이 갚을 돈, 아직 안 갚음
+const isOpenSettlement = st => isUnpaid(st) || isUnreturn(st);
+
 function getSettlementBadge(st) {
   if (!st) return '';
-  if (st.includes('정산 필요') || st.includes('지급 대기'))
-    return `<span class="badge badge-red">${st}</span>`;
-  if (st.includes('지급 완료'))
-    return `<span class="badge badge-blue">${st}</span>`;
-  if (st.includes('개인사용'))
-    return `<span class="badge badge-orange">${st}</span>`;
-  if (st.includes('불필요'))
-    return `<span class="badge badge-gray">${st}</span>`;
+  if (isUnpaid(st))   return `<span class="badge badge-red">${st}</span>`;
+  if (isUnreturn(st)) return `<span class="badge badge-orange">${st}</span>`;
+  if (/지급 완료|반환 완료/.test(st)) return `<span class="badge badge-blue">${st}</span>`;
   return `<span class="badge badge-gray">${st}</span>`;
 }
 
@@ -800,7 +801,7 @@ const NO_SETTLEMENT_CLASSES = new Set([
 ]);
 
 function getSettlementDefault(cls) {
-  return NO_SETTLEMENT_CLASSES.has(cls) ? '정산 불필요' : '정산 필요';
+  return NO_SETTLEMENT_CLASSES.has(cls) ? '공용 지출' : '받을 돈 · 미지급';
 }
 
 function setFormDefaults() {
@@ -857,8 +858,7 @@ function applyFilters() {
   if (fSub) filtered = filtered.filter(r => r.SubCategory === fSub);
   if (fSt)  filtered = filtered.filter(r => r.Settlement === fSt);
   if (activeChipFilter === 'pending')
-    filtered = filtered.filter(r => r.Settlement &&
-      (r.Settlement.includes('정산 필요') || r.Settlement.includes('지급 대기')));
+    filtered = filtered.filter(r => isOpenSettlement(r.Settlement));
 
   filtered.sort((a, b) => {
     const dA = +new Date(a.Date)||0, dB = +new Date(b.Date)||0;
@@ -978,8 +978,7 @@ function renderDashboard(data, month) {
 
   data.forEach(r => {
     const amt = Number(r.Amount)||0;
-    if (r.Settlement && (r.Settlement.includes('정산 필요') || r.Settlement.includes('지급 대기')))
-      pending += amt;
+    if (isUnpaid(r.Settlement)) pending += amt;
     if (r.Date && toLocalDateStr(r.Date).startsWith(month)) {
       if (r.Class !== '제외(개인/저축/이자)' && r.Category !== '10. 저축/투자') {
         total += amt;
@@ -1124,10 +1123,10 @@ document.getElementById('recordForm').addEventListener('submit', async e => {
     SubCategory: document.getElementById('subCategory').value,
     Item:        document.getElementById('item').value,
     Settlement:  document.getElementById('settlement').value,
-    // 수정 시 기존 마감 여부 유지 (예전에는 항상 'Yes'로 덮어씀)
+    // 월 마감 여부(마감 / 진행 중): 새 기록은 '진행 중', 수정 시 기존 값 유지
     Closed:      editId
-      ? ((allData.find(r => String(r.ID) === String(editId)) || {}).Closed || 'Yes')
-      : 'Yes',
+      ? ((allData.find(r => String(r.ID) === String(editId)) || {}).Closed || '진행 중')
+      : '진행 중',
   };
   const isEdit  = !!editId;
   const month   = payload.Date.slice(0, 7);
